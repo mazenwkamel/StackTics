@@ -22,49 +22,43 @@ export function SummaryPanel({ metrics, unplacedBoxIds, boxNames }: SummaryPanel
   return (
     <div className="summary-panel">
       <h3>Summary</h3>
+      <div className="summary-content">
+        <div className="metrics-grid">
+          <div className="metric">
+            <span className="metric-label">Total</span>
+            <span className="metric-value">{metrics.total_boxes}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Placed</span>
+            <span className="metric-value success">{metrics.placed_boxes}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Unplaced</span>
+            <span className={`metric-value ${metrics.total_boxes - metrics.placed_boxes > 0 ? 'warning' : ''}`}>
+              {metrics.total_boxes - metrics.placed_boxes}
+            </span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Used</span>
+            <span className="metric-value">{volumePercent}%</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Free</span>
+            <span className="metric-value">{freePercent}%</span>
+          </div>
+        </div>
 
-      <div className="metrics-grid">
-        <div className="metric">
-          <span className="metric-label">Total Boxes</span>
-          <span className="metric-value">{metrics.total_boxes}</span>
-        </div>
-        <div className="metric">
-          <span className="metric-label">Placed</span>
-          <span className="metric-value success">{metrics.placed_boxes}</span>
-        </div>
-        <div className="metric">
-          <span className="metric-label">Unplaced</span>
-          <span className="metric-value warning">
-            {metrics.total_boxes - metrics.placed_boxes}
-          </span>
-        </div>
+        {unplacedBoxIds.length > 0 && (
+          <div className="unplaced-boxes">
+            <h4>Unplaced Boxes</h4>
+            <ul>
+              {unplacedBoxIds.map((id) => (
+                <li key={id}>{boxNames.get(id) || id}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
-
-      <div className="metrics-grid">
-        <div className="metric">
-          <span className="metric-label">Volume Used</span>
-          <span className="metric-value">{volumePercent}%</span>
-        </div>
-        <div className="metric">
-          <span className="metric-label">Volume Free</span>
-          <span className="metric-value">{freePercent}%</span>
-        </div>
-        <div className="metric">
-          <span className="metric-label">Fragmentation</span>
-          <span className="metric-value">{metrics.fragmentation_score.toFixed(2)}</span>
-        </div>
-      </div>
-
-      {unplacedBoxIds.length > 0 && (
-        <div className="unplaced-boxes">
-          <h4>Unplaced Boxes</h4>
-          <ul>
-            {unplacedBoxIds.map((id) => (
-              <li key={id}>{boxNames.get(id) || id}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

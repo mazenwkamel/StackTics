@@ -17,10 +17,11 @@ function App() {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
 
-  // Result state
+  // Result state - store both placements and the boxes snapshot used
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [unplacedBoxIds, setUnplacedBoxIds] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [resultBoxes, setResultBoxes] = useState<Box[]>([]); // Boxes at time of optimization
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +51,8 @@ function App() {
       setPlacements(response.placements);
       setUnplacedBoxIds(response.unplaced_box_ids);
       setMetrics(response.metrics);
+      // Store a snapshot of boxes used for this optimization
+      setResultBoxes(boxes.map(b => ({ ...b })));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setPlacements([]);
@@ -76,27 +79,58 @@ function App() {
       {error && <div className="error-message">{error}</div>}
 
       <div className="main-content">
-        <div className="left-column">
-          <BedConfigForm bed={bed} onChange={setBed} />
-          <PackingSettingsForm settings={settings} onChange={setSettings} />
-          <BoxListEditor boxes={boxes} onChange={setBoxes} />
-
-          <button
-            className="optimize-button"
-            onClick={handleOptimize}
-            disabled={isLoading || boxes.length === 0}
-          >
-            {isLoading ? 'Optimizing...' : 'Optimize Packing'}
-          </button>
+        {/* Left sidebar - Boxes */}
+        <div className="left-sidebar">
+          <div className="sidebar-header">
+            <h3>Boxes ({boxes.length})</h3>
+            <button type="button" onClick={() => {
+              const newBox: Box = {
+                id: `box-${Date.now()}`,
+                name: `Box ${boxes.length + 1}`,
+                length: 30,
+                width: 20,
+                height: 15,
+                weight: 1,
+                fragility: 'normal',
+                access_frequency: 'sometimes',
+                priority: 'optional',
+                can_rotate_x: true,
+                can_rotate_y: true,
+                can_rotate_z: true,
+              };
+              setBoxes([...boxes, newBox]);
+            }} className="add-button">
+              + Add Box
+            </button>
+          </div>
+          <div className="sidebar-content">
+            <BoxListEditor boxes={boxes} onChange={setBoxes} />
+          </div>
         </div>
 
-        <div className="right-column">
-          <Layout2DView bed={bed} boxes={boxes} placements={placements} />
+        {/* Center - Main view */}
+        <div className="center-column">
+          <Layout2DView bed={bed} boxes={resultBoxes} placements={placements} />
           <SummaryPanel
             metrics={metrics}
             unplacedBoxIds={unplacedBoxIds}
             boxNames={boxNames}
           />
+        </div>
+
+        {/* Right sidebar - Settings */}
+        <div className="right-sidebar">
+          <BedConfigForm bed={bed} onChange={setBed} />
+          <PackingSettingsForm settings={settings} onChange={setSettings} />
+          <div className="form-section">
+            <button
+              className="optimize-button"
+              onClick={handleOptimize}
+              disabled={isLoading || boxes.length === 0}
+            >
+              {isLoading ? 'Optimizing...' : 'Optimize Packing'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
