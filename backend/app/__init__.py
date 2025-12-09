@@ -1,0 +1,1 @@
+"""StackTics backend application."""
