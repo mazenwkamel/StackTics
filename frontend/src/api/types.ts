@@ -2,6 +2,32 @@
  * TypeScript interfaces matching the StackTics API contract.
  */
 
+// ============================================================================
+// Validation Constants (matching backend)
+// ============================================================================
+
+export const VALIDATION = {
+  // Dimension limits (in cm)
+  MIN_DIMENSION: 1,
+  MAX_BED_DIMENSION: 500,
+  MAX_BOX_DIMENSION: 200,
+
+  // Weight limits (in kg)
+  MAX_WEIGHT: 100,
+
+  // Margin/padding limits (in cm)
+  MAX_MARGIN: 50,
+  MAX_PADDING: 20,
+
+  // String limits
+  MAX_NAME_LENGTH: 100,
+  MAX_BOXES: 100,
+} as const;
+
+// ============================================================================
+// Types
+// ============================================================================
+
 export type Fragility = 'robust' | 'normal' | 'fragile';
 export type AccessFrequency = 'rare' | 'sometimes' | 'often';
 export type Priority = 'must_fit' | 'optional';
@@ -12,6 +38,7 @@ export interface Bed {
   width: number;
   height: number;
   margin: number;
+  corner_radius: number;
 }
 
 export interface Box {
@@ -101,6 +128,7 @@ export const defaultBed: Bed = {
   width: 150,
   height: 30,
   margin: 5,
+  corner_radius: 0,
 };
 
 /**

@@ -6,8 +6,10 @@ Implements a 3D bin packing heuristic with support for:
 - Weight and fragility constraints
 - Box rotations
 - Multiple placement strategies
+- Rounded corner containers
 """
 
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -85,6 +87,109 @@ class FreeSpace:
             self.y_end <= other.y or other.y_end <= self.y or
             self.z_end <= other.z or other.z_end <= self.z
         )
+
+
+def point_in_corner_exclusion(
+    px: float, py: float,
+    corner_x: float, corner_y: float,
+    radius: float,
+    corner_type: str,
+) -> bool:
+    """Check if a point falls within a corner exclusion zone.
+
+    The exclusion zone is the area between the square corner and the arc.
+
+    Args:
+        px, py: Point coordinates
+        corner_x, corner_y: Center of the corner arc
+        radius: Corner radius
+        corner_type: One of 'bottom_left', 'bottom_right', 'top_left', 'top_right'
+
+    Returns:
+        True if the point is in the exclusion zone (outside the arc but inside the square).
+    """
+    if radius <= 0:
+        return False
+
+    # Calculate distance from the arc center
+    dx = px - corner_x
+    dy = py - corner_y
+    distance = math.sqrt(dx * dx + dy * dy)
+
+    # Check based on corner type if point is in the corner square region
+    if corner_type == 'bottom_left':
+        in_square = px < corner_x and py < corner_y
+    elif corner_type == 'bottom_right':
+        in_square = px > corner_x and py < corner_y
+    elif corner_type == 'top_left':
+        in_square = px < corner_x and py > corner_y
+    elif corner_type == 'top_right':
+        in_square = px > corner_x and py > corner_y
+    else:
+        return False
+
+    # Point is excluded if it's in the square region AND outside the arc
+    return in_square and distance > radius
+
+
+def box_intersects_corner(
+    box_x: float, box_y: float,
+    box_length: float, box_width: float,
+    bed_length: float, bed_width: float,
+    corner_radius: float,
+    total_margin: float,
+) -> bool:
+    """Check if a box placement intersects with any rounded corner exclusion zone.
+
+    Uses a conservative approach: checks if any corner of the box falls within
+    an exclusion zone, plus checks a grid of points along the edges.
+
+    Args:
+        box_x, box_y: Box position (already includes margin offset)
+        box_length, box_width: Box dimensions
+        bed_length, bed_width: Full bed dimensions
+        corner_radius: Radius of rounded corners
+        total_margin: Total margin from bed edges
+
+    Returns:
+        True if the box intersects any corner exclusion zone.
+    """
+    if corner_radius <= 0:
+        return False
+
+    # Define the four corner arc centers (in bed coordinates)
+    # The arc centers are at (margin + radius, margin + radius) from each corner
+    corners = [
+        # (arc_center_x, arc_center_y, corner_type)
+        (total_margin + corner_radius, total_margin + corner_radius, 'bottom_left'),
+        (bed_length - total_margin - corner_radius, total_margin + corner_radius, 'bottom_right'),
+        (total_margin + corner_radius, bed_width - total_margin - corner_radius, 'top_left'),
+        (bed_length - total_margin - corner_radius, bed_width - total_margin - corner_radius, 'top_right'),
+    ]
+
+    # Points to check: corners of the box and points along edges
+    check_points = [
+        (box_x, box_y),
+        (box_x + box_length, box_y),
+        (box_x, box_y + box_width),
+        (box_x + box_length, box_y + box_width),
+    ]
+
+    # Add edge midpoints for better coverage
+    check_points.extend([
+        (box_x + box_length / 2, box_y),
+        (box_x + box_length / 2, box_y + box_width),
+        (box_x, box_y + box_width / 2),
+        (box_x + box_length, box_y + box_width / 2),
+    ])
+
+    # Check each point against each corner
+    for px, py in check_points:
+        for cx, cy, corner_type in corners:
+            if point_in_corner_exclusion(px, py, cx, cy, corner_radius, corner_type):
+                return True
+
+    return False
 
 
 def get_box_orientations(box: Box) -> list[tuple[float, float, float, Orientation]]:
@@ -300,11 +405,14 @@ def find_placement_position(
     usable_space: FreeSpace,
     padding: float,
     strategy: Strategy,
+    bed: Bed,
+    total_margin: float,
 ) -> Optional[tuple[float, float, float]]:
     """Find the best position for a box with given orientation.
 
     Uses a corner-point heuristic: tries placing at corners of existing boxes
     and at the origin, choosing the position that best fits the strategy.
+    Excludes positions that would intersect with rounded corners.
     """
     length, width, height, _ = orientation
 
@@ -333,6 +441,14 @@ def find_placement_position(
         if y < usable_space.y or y + width > usable_space.y_end:
             continue
         if z < usable_space.z or z + height > usable_space.z_end:
+            continue
+
+        # Check if box intersects with any rounded corner
+        if box_intersects_corner(
+            x, y, length, width,
+            bed.length, bed.width,
+            bed.corner_radius, total_margin
+        ):
             continue
 
         # Check collision with placed boxes
@@ -461,6 +577,7 @@ def optimize_packing(
                 box, (length, width, height, orientation),
                 placed_boxes, boxes_by_id, usable_space,
                 settings.padding, settings.strategy,
+                bed, total_margin,
             )
 
             if position:

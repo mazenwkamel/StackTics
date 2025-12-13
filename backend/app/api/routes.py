@@ -43,6 +43,7 @@ async def optimize(request: OptimizeRequest) -> OptimizeResponse:
         width=request.bed.width,
         height=request.bed.height,
         margin=request.bed.margin,
+        corner_radius=request.bed.corner_radius,
     )
 
     boxes = [

@@ -55,6 +55,18 @@ export function BedConfigForm({ bed, onChange }: BedConfigFormProps) {
             onChange={(e) => handleChange('margin', e.target.value)}
           />
         </label>
+        <label>
+          Corner Radius (cm):
+          <input
+            type="number"
+            min="0"
+            max={Math.min(bed.length, bed.width) / 2}
+            step="1"
+            value={bed.corner_radius}
+            onChange={(e) => handleChange('corner_radius', e.target.value)}
+          />
+          <span className="hint">0 = sharp corners</span>
+        </label>
       </div>
     </div>
   );

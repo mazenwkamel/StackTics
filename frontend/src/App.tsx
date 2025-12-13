@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import './App.css';
 
 import type { Bed, Box, Settings, Placement, Metrics } from './api/types';
-import { defaultBed, defaultSettings } from './api/types';
-import { checkHealth, optimize } from './api/client';
+import { defaultBed, defaultSettings, VALIDATION } from './api/types';
+import { checkHealth, optimize, ApiError } from './api/client';
+import { validateOptimizeRequest } from './api/validation';
 
 import { BedConfigForm } from './components/BedConfigForm';
 import { BoxListEditor } from './components/BoxListEditor';
@@ -38,8 +39,29 @@ function App() {
   const boxNames = new Map(boxes.map((b) => [b.id, b.name]));
 
   const handleOptimize = async () => {
+    // Check for empty boxes
     if (boxes.length === 0) {
       setError('Please add at least one box before optimizing.');
+      return;
+    }
+
+    // Check max boxes limit
+    if (boxes.length > VALIDATION.MAX_BOXES) {
+      setError(`Too many boxes. Maximum is ${VALIDATION.MAX_BOXES} boxes.`);
+      return;
+    }
+
+    // Run frontend validation first
+    const validation = validateOptimizeRequest(bed, boxes, settings);
+    if (!validation.valid) {
+      // Show first 3 errors
+      const errorMessages = validation.errors
+        .slice(0, 3)
+        .map((e) => e.message);
+      if (validation.errors.length > 3) {
+        errorMessages.push(`...and ${validation.errors.length - 3} more issues`);
+      }
+      setError(errorMessages.join('\n'));
       return;
     }
 
@@ -54,7 +76,14 @@ function App() {
       // Store a snapshot of boxes used for this optimization
       setResultBoxes(boxes.map(b => ({ ...b })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      // Handle API errors with better messages
+      if (err instanceof ApiError) {
+        setError(err.getUserMessage());
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
+      }
       setPlacements([]);
       setUnplacedBoxIds([]);
       setMetrics(null);

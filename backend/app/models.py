@@ -42,6 +42,7 @@ class Bed:
     width: float   # cm, across the bed
     height: float  # cm, vertical clearance
     margin: float  # cm, margin from all edges
+    corner_radius: float = 0  # cm, radius for rounded corners
 
 
 @dataclass

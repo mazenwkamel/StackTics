@@ -133,20 +133,27 @@ function assignLayers(placements: Placement[], boxes: Map<string, Box>): PlacedB
 
 export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
   const boxesById = new Map(boxes.map((box) => [box.id, box]));
-  const svgPadding = 24;
-  const maxWidth = 450;
-  const maxHeight = 280;
+  const svgPadding = 40; // Extra padding for labels
+  const maxWidth = 400;
+  const maxHeight = 350;
 
+  // Rotated view: bed.width is horizontal (X), bed.length is vertical (Y)
+  // Head of bed at top (y=0), foot at bottom (y=length)
   const scale = Math.min(
-    (maxWidth - 2 * svgPadding) / bed.length,
-    (maxHeight - 2 * svgPadding) / bed.width
+    (maxWidth - 2 * svgPadding) / bed.width,
+    (maxHeight - 2 * svgPadding) / bed.length
   );
 
-  const svgWidth = bed.length * scale + 2 * svgPadding;
-  const svgHeight = bed.width * scale + 2 * svgPadding + 28; // Extra space for legend
+  const bedVisualWidth = bed.width * scale;   // Horizontal extent
+  const bedVisualHeight = bed.length * scale; // Vertical extent
 
-  const toSvgX = (x: number) => svgPadding + x * scale;
-  const toSvgY = (y: number) => svgPadding + y * scale;
+  const svgWidth = bedVisualWidth + 2 * svgPadding;
+  const svgHeight = bedVisualHeight + 2 * svgPadding + 32; // Extra space for legend
+
+  // Transform coordinates: original (x along length, y along width)
+  // becomes (x along width = horizontal, y along length = vertical)
+  const toSvgX = (origY: number) => svgPadding + origY * scale;  // Original Y -> SVG X
+  const toSvgY = (origX: number) => svgPadding + origX * scale;  // Original X -> SVG Y
 
   const placedBoxes = assignLayers(placements, boxesById);
   const numLayers = Math.max(0, ...placedBoxes.map(p => p.layer)) + 1;
@@ -161,24 +168,106 @@ export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
           className="layout-svg"
         >
-        {/* Bed outline */}
+        {/* Head of bed indicator (top) */}
+        <g transform={`translate(${svgPadding + bedVisualWidth / 2}, ${svgPadding - 8})`}>
+          <rect
+            x="-28"
+            y="-14"
+            width="56"
+            height="18"
+            fill="#1f2937"
+            rx="4"
+          />
+          <text
+            x="0"
+            y="-2"
+            textAnchor="middle"
+            fontSize="10"
+            fontWeight="600"
+            fill="white"
+            letterSpacing="0.5"
+          >
+            HEAD
+          </text>
+        </g>
+
+        {/* Bed outline with corner radius */}
         <rect
           x={svgPadding}
           y={svgPadding}
-          width={bed.length * scale}
-          height={bed.width * scale}
+          width={bedVisualWidth}
+          height={bedVisualHeight}
           fill="#fafafa"
-          stroke="#333"
+          stroke="#374151"
           strokeWidth="2"
+          rx={bed.corner_radius * scale}
         />
+
+        {/* Corner exclusion zones - show where boxes can't be placed */}
+        {bed.corner_radius > 0 && (
+          <>
+            {/* Top-left corner */}
+            <path
+              d={`M ${svgPadding} ${svgPadding + bed.corner_radius * scale}
+                  L ${svgPadding} ${svgPadding}
+                  L ${svgPadding + bed.corner_radius * scale} ${svgPadding}
+                  A ${bed.corner_radius * scale} ${bed.corner_radius * scale} 0 0 0
+                    ${svgPadding} ${svgPadding + bed.corner_radius * scale}
+                  Z`}
+              fill="rgba(239, 68, 68, 0.15)"
+              stroke="rgba(239, 68, 68, 0.4)"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+            />
+            {/* Top-right corner */}
+            <path
+              d={`M ${svgPadding + bedVisualWidth - bed.corner_radius * scale} ${svgPadding}
+                  L ${svgPadding + bedVisualWidth} ${svgPadding}
+                  L ${svgPadding + bedVisualWidth} ${svgPadding + bed.corner_radius * scale}
+                  A ${bed.corner_radius * scale} ${bed.corner_radius * scale} 0 0 0
+                    ${svgPadding + bedVisualWidth - bed.corner_radius * scale} ${svgPadding}
+                  Z`}
+              fill="rgba(239, 68, 68, 0.15)"
+              stroke="rgba(239, 68, 68, 0.4)"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+            />
+            {/* Bottom-left corner */}
+            <path
+              d={`M ${svgPadding} ${svgPadding + bedVisualHeight - bed.corner_radius * scale}
+                  L ${svgPadding} ${svgPadding + bedVisualHeight}
+                  L ${svgPadding + bed.corner_radius * scale} ${svgPadding + bedVisualHeight}
+                  A ${bed.corner_radius * scale} ${bed.corner_radius * scale} 0 0 0
+                    ${svgPadding} ${svgPadding + bedVisualHeight - bed.corner_radius * scale}
+                  Z`}
+              fill="rgba(239, 68, 68, 0.15)"
+              stroke="rgba(239, 68, 68, 0.4)"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+            />
+            {/* Bottom-right corner */}
+            <path
+              d={`M ${svgPadding + bedVisualWidth} ${svgPadding + bedVisualHeight - bed.corner_radius * scale}
+                  L ${svgPadding + bedVisualWidth} ${svgPadding + bedVisualHeight}
+                  L ${svgPadding + bedVisualWidth - bed.corner_radius * scale} ${svgPadding + bedVisualHeight}
+                  A ${bed.corner_radius * scale} ${bed.corner_radius * scale} 0 0 0
+                    ${svgPadding + bedVisualWidth} ${svgPadding + bedVisualHeight - bed.corner_radius * scale}
+                  Z`}
+              fill="rgba(239, 68, 68, 0.15)"
+              stroke="rgba(239, 68, 68, 0.4)"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+            />
+          </>
+        )}
 
         {/* Margin indicator */}
         {bed.margin > 0 && (
           <rect
             x={svgPadding + bed.margin * scale}
             y={svgPadding + bed.margin * scale}
-            width={(bed.length - 2 * bed.margin) * scale}
-            height={(bed.width - 2 * bed.margin) * scale}
+            width={(bed.width - 2 * bed.margin) * scale}
+            height={(bed.length - 2 * bed.margin) * scale}
             fill="none"
             stroke="#aaa"
             strokeWidth="1"
@@ -186,69 +275,98 @@ export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
           />
         )}
 
-        {/* Grid lines for reference */}
-        {Array.from({ length: Math.floor(bed.length / 50) }).map((_, i) => (
+        {/* Grid lines for reference - vertical lines (along width) */}
+        {Array.from({ length: Math.floor(bed.width / 50) }).map((_, i) => (
           <line
             key={`vgrid-${i}`}
-            x1={toSvgX((i + 1) * 50)}
+            x1={svgPadding + (i + 1) * 50 * scale}
             y1={svgPadding}
-            x2={toSvgX((i + 1) * 50)}
-            y2={svgPadding + bed.width * scale}
+            x2={svgPadding + (i + 1) * 50 * scale}
+            y2={svgPadding + bedVisualHeight}
             stroke="#eee"
             strokeWidth="1"
           />
         ))}
-        {Array.from({ length: Math.floor(bed.width / 50) }).map((_, i) => (
+        {/* Horizontal grid lines (along length) */}
+        {Array.from({ length: Math.floor(bed.length / 50) }).map((_, i) => (
           <line
             key={`hgrid-${i}`}
             x1={svgPadding}
-            y1={toSvgY((i + 1) * 50)}
-            x2={svgPadding + bed.length * scale}
-            y2={toSvgY((i + 1) * 50)}
+            y1={svgPadding + (i + 1) * 50 * scale}
+            x2={svgPadding + bedVisualWidth}
+            y2={svgPadding + (i + 1) * 50 * scale}
             stroke="#eee"
             strokeWidth="1"
           />
         ))}
+
+        {/* Foot of bed indicator (bottom) */}
+        <g transform={`translate(${svgPadding + bedVisualWidth / 2}, ${svgPadding + bedVisualHeight + 8})`}>
+          <rect
+            x="-28"
+            y="-4"
+            width="56"
+            height="18"
+            fill="#6b7280"
+            rx="4"
+          />
+          <text
+            x="0"
+            y="9"
+            textAnchor="middle"
+            fontSize="10"
+            fontWeight="600"
+            fill="white"
+            letterSpacing="0.5"
+          >
+            FOOT
+          </text>
+        </g>
 
         {/* Placed boxes */}
         {placedBoxes.map((info) => {
           const { placement, box, placedLength, placedWidth, layer, isRotated } = info;
           const colors = LAYER_COLORS[layer % LAYER_COLORS.length];
-          const boxWidth = placedLength * scale;
-          const boxHeight = placedWidth * scale;
+          // Rotated: placedWidth becomes visual width (horizontal), placedLength becomes visual height (vertical)
+          const boxVisualWidth = placedWidth * scale;
+          const boxVisualHeight = placedLength * scale;
 
           // Offset for stacked boxes to show depth
           const stackOffset = layer * 3;
+
+          // Rotated coordinates: placement.y -> SVG X, placement.x -> SVG Y
+          const svgX = toSvgX(placement.y) + stackOffset;
+          const svgY = toSvgY(placement.x) + stackOffset;
 
           return (
             <g key={placement.box_id}>
               {/* Shadow for depth effect on stacked boxes */}
               {layer > 0 && (
                 <rect
-                  x={toSvgX(placement.x) + stackOffset + 2}
-                  y={toSvgY(placement.y) + stackOffset + 2}
-                  width={boxWidth}
-                  height={boxHeight}
+                  x={svgX + 2}
+                  y={svgY + 2}
+                  width={boxVisualWidth}
+                  height={boxVisualHeight}
                   fill="rgba(0,0,0,0.2)"
-                  rx="0"
+                  rx="2"
                 />
               )}
               {/* Box rectangle */}
               <rect
-                x={toSvgX(placement.x) + stackOffset}
-                y={toSvgY(placement.y) + stackOffset}
-                width={boxWidth}
-                height={boxHeight}
+                x={svgX}
+                y={svgY}
+                width={boxVisualWidth}
+                height={boxVisualHeight}
                 fill={colors.fill}
                 fillOpacity={0.85}
                 stroke={colors.stroke}
                 strokeWidth="2"
-                rx="0"
+                rx="2"
               />
               {/* Box label */}
               <text
-                x={toSvgX(placement.x) + stackOffset + boxWidth / 2}
-                y={toSvgY(placement.y) + stackOffset + boxHeight / 2 - 6}
+                x={svgX + boxVisualWidth / 2}
+                y={svgY + boxVisualHeight / 2 - 6}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize="11"
@@ -260,8 +378,8 @@ export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
               </text>
               {/* Z position label */}
               <text
-                x={toSvgX(placement.x) + stackOffset + boxWidth / 2}
-                y={toSvgY(placement.y) + stackOffset + boxHeight / 2 + 8}
+                x={svgX + boxVisualWidth / 2}
+                y={svgY + boxVisualHeight / 2 + 8}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize="9"
@@ -270,19 +388,19 @@ export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
                 z={placement.z}cm
               </text>
               {/* Rotation indicator badge */}
-              {isRotated && boxWidth > 30 && boxHeight > 25 && (
+              {isRotated && boxVisualWidth > 30 && boxVisualHeight > 25 && (
                 <g>
                   <rect
-                    x={toSvgX(placement.x) + stackOffset + boxWidth - 22}
-                    y={toSvgY(placement.y) + stackOffset + 2}
+                    x={svgX + boxVisualWidth - 22}
+                    y={svgY + 2}
                     width="20"
                     height="12"
                     fill="rgba(255,255,255,0.9)"
-                    rx="0"
+                    rx="2"
                   />
                   <text
-                    x={toSvgX(placement.x) + stackOffset + boxWidth - 12}
-                    y={toSvgY(placement.y) + stackOffset + 10}
+                    x={svgX + boxVisualWidth - 12}
+                    y={svgY + 10}
                     textAnchor="middle"
                     fontSize="7"
                     fontWeight="600"
@@ -296,44 +414,44 @@ export function Layout2DView({ bed, boxes, placements }: Layout2DViewProps) {
           );
         })}
 
-        {/* Dimension labels */}
+        {/* Dimension labels - Width on top (horizontal), Length on side (vertical) */}
         <text
-          x={svgPadding + (bed.length * scale) / 2}
-          y={svgPadding - 8}
+          x={svgPadding + bedVisualWidth / 2}
+          y={svgPadding - 24}
           textAnchor="middle"
           fontSize="11"
-          fill="#666"
+          fill="#999"
         >
-          {bed.length}cm
+          {bed.width}cm (width)
         </text>
         <text
-          x={svgPadding - 8}
-          y={svgPadding + (bed.width * scale) / 2}
+          x={svgPadding - 12}
+          y={svgPadding + bedVisualHeight / 2}
           textAnchor="middle"
           fontSize="11"
-          fill="#666"
-          transform={`rotate(-90, ${svgPadding - 8}, ${svgPadding + (bed.width * scale) / 2})`}
+          fill="#999"
+          transform={`rotate(-90, ${svgPadding - 12}, ${svgPadding + bedVisualHeight / 2})`}
         >
-          {bed.width}cm
+          {bed.length}cm (length)
         </text>
 
         {/* Layer legend */}
         {numLayers > 0 && (
-          <g transform={`translate(${svgPadding}, ${svgHeight - 30})`}>
-            <text x="0" y="0" fontSize="10" fill="#666">Layers:</text>
+          <g transform={`translate(${svgPadding}, ${svgHeight - 28})`}>
+            <text x="0" y="0" fontSize="10" fill="#666" fontWeight="500">Layers:</text>
             {Array.from({ length: numLayers }).map((_, i) => {
               const colors = LAYER_COLORS[i % LAYER_COLORS.length];
               return (
                 <g key={i} transform={`translate(${50 + i * 70}, -5)`}>
                   <rect
-                    width="16"
-                    height="16"
+                    width="14"
+                    height="14"
                     fill={colors.fill}
                     stroke={colors.stroke}
                     strokeWidth="1"
-                    rx="0"
+                    rx="3"
                   />
-                  <text x="20" y="12" fontSize="10" fill="#666">
+                  <text x="18" y="11" fontSize="10" fill="#666">
                     {i === 0 ? 'Floor' : `Layer ${i}`}
                   </text>
                 </g>
